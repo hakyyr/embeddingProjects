@@ -1,0 +1,22 @@
+# Keil MDK / ARM build output
+**/Objects/
+**/Listings/
+*.o
+*.d
+*.crf
+*.axf
+*.map
+*.lst
+*.lnp
+*.dep
+*.htm
+*.iex
+*.lin
+
+# User-specific IDE settings
+*.uvoptx
+*.dbgconf
+
+# Common temporary files
+*.bak
+*.tmp
