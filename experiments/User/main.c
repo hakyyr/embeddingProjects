@@ -1,73 +1,56 @@
 #include "stm32f10x.h"
+#include "stm32f10x_tim.h"
 #include "OLED.h"
 #include "misc.h"
 
-volatile int32_t g_EncoderCount = 0;
-volatile uint8_t g_EncoderState = 0;
-volatile int8_t g_EncoderDelta = 0;
+volatile uint32_t g_TimerCount = 0;
 
-static void Encoder_Init(void);
+static void Timer2_Init(void);
 
 int main(void)
 {
-    int32_t lastCount = 0x7FFFFFFF;
+    uint32_t lastCount = 0xFFFFFFFF;
 
     OLED_Init();
-    Encoder_Init();
+    Timer2_Init();
 
     while (1)
     {
-        if (lastCount != g_EncoderCount)
+        if (lastCount != g_TimerCount)
         {
-            lastCount = g_EncoderCount;
+            lastCount = g_TimerCount;
 
             OLED_Clear();
-            OLED_ShowString(1, 1, "ENCODER:");
-            OLED_ShowSignedNum(2, 1, g_EncoderCount, 5);
+            OLED_ShowString(1, 1, "COUNT:");
+            OLED_ShowNum(2, 1, g_TimerCount, 5);
             OLED_Update();
         }
     }
 }
 
-static void Encoder_Init(void)
+static void Timer2_Init(void)
 {
-    GPIO_InitTypeDef GPIO_InitStructure;
-    EXTI_InitTypeDef EXTI_InitStructure;
+    TIM_TimeBaseInitTypeDef TIM_TimeBaseStructure;
     NVIC_InitTypeDef NVIC_InitStructure;
 
-    RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOB | RCC_APB2Periph_AFIO, ENABLE);
+    RCC_APB1PeriphClockCmd(RCC_APB1Periph_TIM2, ENABLE);
 
-    GPIO_InitStructure.GPIO_Pin = GPIO_Pin_0 | GPIO_Pin_1;
-    GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IPU;
-    GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
-    GPIO_Init(GPIOB, &GPIO_InitStructure);
+    TIM_TimeBaseStructure.TIM_ClockDivision = TIM_CKD_DIV1;
+    TIM_TimeBaseStructure.TIM_CounterMode = TIM_CounterMode_Up;
+    TIM_TimeBaseStructure.TIM_Period = 10000 - 1;
+    TIM_TimeBaseStructure.TIM_Prescaler = 7200 - 1;
+    TIM_TimeBaseStructure.TIM_RepetitionCounter = 0;
+    TIM_TimeBaseInit(TIM2, &TIM_TimeBaseStructure);
 
-    GPIO_EXTILineConfig(GPIO_PortSourceGPIOB, GPIO_PinSource0);
-    GPIO_EXTILineConfig(GPIO_PortSourceGPIOB, GPIO_PinSource1);
-
-    EXTI_InitStructure.EXTI_Mode = EXTI_Mode_Interrupt;
-    EXTI_InitStructure.EXTI_Trigger = EXTI_Trigger_Rising_Falling;
-    EXTI_InitStructure.EXTI_LineCmd = ENABLE;
-
-    EXTI_InitStructure.EXTI_Line = EXTI_Line0;
-    EXTI_Init(&EXTI_InitStructure);
-
-    EXTI_InitStructure.EXTI_Line = EXTI_Line1;
-    EXTI_Init(&EXTI_InitStructure);
+    TIM_ClearFlag(TIM2, TIM_FLAG_Update);
+    TIM_ITConfig(TIM2, TIM_IT_Update, ENABLE);
 
     NVIC_PriorityGroupConfig(NVIC_PriorityGroup_2);
-
+    NVIC_InitStructure.NVIC_IRQChannel = TIM2_IRQn;
     NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 1;
     NVIC_InitStructure.NVIC_IRQChannelSubPriority = 1;
     NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
-
-    NVIC_InitStructure.NVIC_IRQChannel = EXTI0_IRQn;
     NVIC_Init(&NVIC_InitStructure);
 
-    NVIC_InitStructure.NVIC_IRQChannel = EXTI1_IRQn;
-    NVIC_Init(&NVIC_InitStructure);
-
-    g_EncoderState =
-        (uint8_t)(GPIO_ReadInputDataBit(GPIOB, GPIO_Pin_0) << 1) |
-        (uint8_t)GPIO_ReadInputDataBit(GPIOB, GPIO_Pin_1);
+    TIM_Cmd(TIM2, ENABLE);
 }
